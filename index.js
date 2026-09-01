@@ -248,3 +248,7 @@ socket.on('message', (data) => {
     socket.send(leaderboardText);
   }
 });
+const express = require('express');
+const app = express();
+app.get('/', (req, res) => res.send('Bot is online!'));
+app.listen(process.env.PORT || 10000);
