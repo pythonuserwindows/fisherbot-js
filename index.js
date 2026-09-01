@@ -6,10 +6,13 @@ const fs = require('fs');
 const path = require('path');
 
 // Socket connection with auto-reconnect
-const socket = io('http://windows93.net', {
+// Use the correct Trollbox endpoint with port 8081
+const socket = io('https://www.windows93.net:8081', {
+    transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000
+    reconnectionDelay: 1000,
+    secure: true
 });
 
 const SCORE_FILE = path.join(__dirname, 'scores.json');
@@ -73,17 +76,24 @@ function getRandomItem(type) {
 
 socket.on('connect', () => {
     console.log('FisherBot online and connected to Trollbox.');
-    socket.emit('user joined', 'FisherBot', '#00ffcc', '', '', '');
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Disconnected from Trollbox:', reason);
 });
 
 socket.on('message', (data) => {
     // Basic verification guard
-    if (!data || data.user === 'FisherBot' || !data.msg) return;
+    if (!data || data.author === 'FisherBot' || !data.text) return;
 
-    const msg = data.msg.trim();
+    const msg = data.text.trim();
     const args = msg.split(' ');
     const cmd = args[0].toLowerCase();
-    const username = data.user;
+    const username = data.author;
 
     if (!scoreTracker[username]) {
         scoreTracker[username] = { junk: 0, fish: 0, rare: 0, total: 0, cash: 50, bait: 0 };
@@ -100,14 +110,11 @@ socket.on('message', (data) => {
 
     // COMMAND: f?help
     if (cmd === 'f?help' || cmd === 'f?commands') {
-        socket.send(`@${username} FisherBot Commands:\n` +
-            `f?help - Show this help message\n` +
-            `f?fish - Cast and try to catch items (uses bait if available)\n` +
-            `f?stats - Show your wallet, bait, and totals\n` +
-            `f?shop [buy] - Show shop; 'f?shop buy' buys Golden Bait ($${BAIT_PRICE})\n` +
-            `f?steal <user> - Attempt to steal money from a user (risky)\n` +
-            `f?gamble <amount|all> <heads/tails> - Coinflip gamble\n` +
-            `f?top - Shows the top 3 richest players`);
+        socket.emit('message', {
+            text: `@${username} FisherBot Commands:\nf?help - Show this help message\nf?fish - Cast and try to catch items (uses bait if available)\nf?stats - Show your wallet, bait, and totals\nf?shop [buy] - Show shop; 'f?shop buy' buys Golden Bait ($${BAIT_PRICE})\nf?steal <user> - Attempt to steal money from a user (risky)\nf?gamble <amount|all> <heads/tails> - Coinflip gamble\nf?top - Shows the top 3 richest players`,
+            author: 'FisherBot',
+            color: '#00ffcc'
+        });
         return;
     }
 
@@ -135,13 +142,21 @@ socket.on('message', (data) => {
         scoreTracker[username].total++;
         scoreTracker[username].cash += caught.value;
         saveScores();
-        socket.send(`@${username} reeled in a ${caught.name} (Worth $${caught.value}). "${caught.dialogue}"`);
+        socket.emit('message', {
+            text: `@${username} reeled in a ${caught.name} (Worth $${caught.value}). "${caught.dialogue}"`,
+            author: 'FisherBot',
+            color: '#00ffcc'
+        });
     }
 
     // COMMAND 2: f?stats
     if (cmd === 'f?stats') {
         const stats = scoreTracker[username];
-        socket.send(`@${username} -> Wallet: $${stats.cash} | Bait: ${stats.bait} | Total: ${stats.total} (🐟:${stats.fish} 🗑️:${stats.junk} 👑:${stats.rare})`);
+        socket.emit('message', {
+            text: `@${username} -> Wallet: $${stats.cash} | Bait: ${stats.bait} | Total: ${stats.total} (🐟:${stats.fish} 🗑️:${stats.junk} 👑:${stats.rare})`,
+            author: 'FisherBot',
+            color: '#00ffcc'
+        });
     }
 
     // COMMAND 3: f?shop
@@ -151,12 +166,24 @@ socket.on('message', (data) => {
                 scoreTracker[username].cash -= BAIT_PRICE;
                 scoreTracker[username].bait += 1;
                 saveScores();
-                socket.send(`@${username} bought 1 Golden Bait charge for $${BAIT_PRICE}! Next cast has high luck.`);
+                socket.emit('message', {
+                    text: `@${username} bought 1 Golden Bait charge for $${BAIT_PRICE}! Next cast has high luck.`,
+                    author: 'FisherBot',
+                    color: '#00ffcc'
+                });
             } else {
-                socket.send(`@${username} You need $${BAIT_PRICE} for bait. You only have $${scoreTracker[username].cash}.`);
+                socket.emit('message', {
+                    text: `@${username} You need $${BAIT_PRICE} for bait. You only have $${scoreTracker[username].cash}.`,
+                    author: 'FisherBot',
+                    color: '#00ffcc'
+                });
             }
         } else {
-            socket.send(`🛒 SHOP -> Type "f?shop buy" to get Golden Bait for $${BAIT_PRICE}. (Boosts rare luck)`);
+            socket.emit('message', {
+                text: `🛒 SHOP -> Type "f?shop buy" to get Golden Bait for $${BAIT_PRICE}. (Boosts rare luck)`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
         }
     }
 
@@ -164,18 +191,30 @@ socket.on('message', (data) => {
     if (cmd === 'f?steal') {
         const target = args.slice(1).join(' ').trim();
         if (!target) {
-            socket.send(`@${username} Provide a target name. Example: f?steal TargetUser`);
+            socket.emit('message', {
+                text: `@${username} Provide a target name. Example: f?steal TargetUser`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
         const targetKey = Object.keys(scoreTracker).find(k => k.toLowerCase() === target.toLowerCase());
         if (!targetKey || targetKey === username) {
-            socket.send(`@${username} Cannot rob that target.`);
+            socket.emit('message', {
+                text: `@${username} Cannot rob that target.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
         if (scoreTracker[targetKey].cash < 20) {
-            socket.send(`@${username} Target is completely broke.`);
+            socket.emit('message', {
+                text: `@${username} Target is completely broke.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
@@ -185,12 +224,20 @@ socket.on('message', (data) => {
             scoreTracker[targetKey].cash -= stolenAmount;
             scoreTracker[username].cash += stolenAmount;
             saveScores();
-            socket.send(`💥 ROBBERY! @${username} stole $${stolenAmount} from @${targetKey}!`);
+            socket.emit('message', {
+                text: `💥 ROBBERY! @${username} stole $${stolenAmount} from @${targetKey}!`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
         } else {
             const penalty = 30;
             scoreTracker[username].cash = Math.max(0, scoreTracker[username].cash - penalty);
             saveScores();
-            socket.send(`🚓 FAIL! @${username} got caught robbing @${targetKey} and lost $${penalty}.`);
+            socket.emit('message', {
+                text: `🚓 FAIL! @${username} got caught robbing @${targetKey} and lost $${penalty}.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
         }
     }
 
@@ -200,7 +247,11 @@ socket.on('message', (data) => {
         const choiceInput = args[2];
 
         if (!betInput || !choiceInput) {
-            socket.send(`@${username} Use: f?gamble <amount> <heads/tails> -> Example: f?gamble 50 heads`);
+            socket.emit('message', {
+                text: `@${username} Use: f?gamble <amount> <heads/tails> -> Example: f?gamble 50 heads`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
@@ -210,18 +261,30 @@ socket.on('message', (data) => {
         }
 
         if (isNaN(bet) || bet <= 0) {
-            socket.send(`@${username} Enter a valid number or 'all'.`);
+            socket.emit('message', {
+                text: `@${username} Enter a valid number or 'all'.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
         if (scoreTracker[username].cash < bet) {
-            socket.send(`@${username} You don't have enough cash for that bet.`);
+            socket.emit('message', {
+                text: `@${username} You don't have enough cash for that bet.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
         const choice = choiceInput.toLowerCase();
         if (choice !== 'heads' && choice !== 'tails') {
-            socket.send(`@${username} Pick 'heads' or 'tails'.`);
+            socket.emit('message', {
+                text: `@${username} Pick 'heads' or 'tails'.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
             return;
         }
 
@@ -229,11 +292,19 @@ socket.on('message', (data) => {
         if (choice === flipResult) {
             scoreTracker[username].cash += bet;
             saveScores();
-            socket.send(`🪙 COINFLIP: It landed on ${flipResult}! @${username} wins $${bet}!`);
+            socket.emit('message', {
+                text: `🪙 COINFLIP: It landed on ${flipResult}! @${username} wins $${bet}!`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
         } else {
             scoreTracker[username].cash -= bet;
             saveScores();
-            socket.send(`🪙 COINFLIP: It landed on ${flipResult}! @${username} lost $${bet}.`);
+            socket.emit('message', {
+                text: `🪙 COINFLIP: It landed on ${flipResult}! @${username} lost $${bet}.`,
+                author: 'FisherBot',
+                color: '#00ffcc'
+            });
         }
     }
 
@@ -247,7 +318,11 @@ socket.on('message', (data) => {
         let leaderboardText = "💰 RICHEST FISHERS 💰 -> ";
         const lines = top3.map((player, index) => `#${index + 1}: ${player[0]} ($${player[1].cash})`);
         leaderboardText += lines.join(' | ');
-        socket.send(leaderboardText);
+        socket.emit('message', {
+            text: leaderboardText,
+            author: 'FisherBot',
+            color: '#00ffcc'
+        });
     }
 });
 
