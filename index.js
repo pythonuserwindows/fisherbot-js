@@ -250,3 +250,16 @@ socket.on('message', (data) => {
         socket.send(leaderboardText);
     }
 });
+
+// Health check server for Render deployment
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+    res.send('🎣 FisherBot is running');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Health check server running on port ${PORT}`);
+});
