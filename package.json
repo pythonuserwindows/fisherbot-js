@@ -1,0 +1,19 @@
+{
+  "name": "fisherbot-js",
+  "version": "1.0.0",
+  "description": "Fishing game chat bot using socket.io (FisherBot)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "fishing",
+    "bot",
+    "socket.io"
+  ],
+  "author": "pythonuserwindows",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io-client": "^4.7.0"
+  }
+}
