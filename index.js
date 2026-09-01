@@ -5,7 +5,7 @@ const io = require('socket.io-client');
 const fs = require('fs');
 const path = require('path');
 
-// FIXED: Added the correct 8081 port and configuration parameters for auto-reconnecting
+// Socket connection with auto-reconnect
 const socket = io('http://windows93.net', {
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -71,7 +71,6 @@ function getRandomItem(type) {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// FIXED: Switched from '_connected' to the official standard socket 'connect' event
 socket.on('connect', () => {
     console.log('FisherBot online and connected to Trollbox.');
     socket.emit('user joined', 'FisherBot', '#00ffcc', '', '', '');
@@ -243,9 +242,11 @@ socket.on('message', (data) => {
         const players = Object.entries(scoreTracker);
         if (players.length === 0) return;
 
-        players.sort((a, b) => b.cash - a.cash);
+        players.sort((a, b) => b[1].cash - a[1].cash);
         const top3 = players.slice(0, 3);
         let leaderboardText = "💰 RICHEST FISHERS 💰 -> ";
         const lines = top3.map((player, index) => `#${index + 1}: ${player[0]} ($${player[1].cash})`);
         leaderboardText += lines.join(' | ');
-Use code with caution.socket.send(leaderboardText);}});// Express Server Setup to pass Render Port Scanningconst express = require('express');const app = express();app.get('/', (req, res) => res.send('FisherBot Web Gateway Active!'));app.listen(process.env.PORT || 10000);
+        socket.send(leaderboardText);
+    }
+});
